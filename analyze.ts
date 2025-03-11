@@ -14,7 +14,7 @@ if (!DISCORD_WEBHOOK_URL) {
 const IP_TIMEOUT = 60000;
 const MAX_MESSAGES = 5;
 const BATCH_INTERVAL = 60000;
-const QUEUE_INTERVAL = 5000;
+const QUEUE_INTERVAL = 60000;
 let messageQueue: string[] = [];
 let lastSeenIPs: { [key: string]: number } = {};
 let lastSentTimestamp = 0;
