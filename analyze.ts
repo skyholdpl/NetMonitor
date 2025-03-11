@@ -11,19 +11,31 @@ if (!DISCORD_WEBHOOK_URL) {
   process.exit(1);
 }
 
+const IP_TIMEOUT = 60000;
+const MAX_MESSAGES = 5;
+const BATCH_INTERVAL = 60000;
+const QUEUE_INTERVAL = 5000;
+let messageQueue: string[] = [];
+let lastSeenIPs: { [key: string]: number } = {};
+let lastSentTimestamp = 0;
+
 async function getIPInfo(ip: string): Promise<string> {
   try {
     const res = await axios.get(`https://ipinfo.io/${ip}/json`);
-    return `${res.data.city || "Nieznane"}, ${res.data.country || "Nieznane"}`;
+    const location = `${res.data.city || "Nieznane"}, ${
+      res.data.country || "Nieznane"
+    }`;
+    const isp = res.data.org || "Nieznany ISP";
+    return `${location} - ISP: ${isp}`;
   } catch (error) {
-    return "Nieznane";
+    return "Nieznane - ISP: Nieznane";
   }
 }
 
 function analyzeTraffic() {
   console.log("🚀 Monitoring ruchu sieciowego...");
 
-  const process = exec("sudo tcpdump -i eth0 -nn -q -c 10");
+  const process = exec("sudo tcpdump -i eth0 -nn -q");
 
   process.stdout?.on("data", async (data) => {
     const lines = data.toString().split("\n");
@@ -33,25 +45,50 @@ function analyzeTraffic() {
       if (parts.length < 5) continue;
 
       let ip = parts[2].split(".").slice(0, 4).join(".");
-      let size = parts[parts.length - 1];
+      let size = parseInt(parts[parts.length - 1], 10);
 
-      if (!ip.includes(".")) continue;
+      if (!ip.includes(".") || isNaN(size) || size === 0) continue;
 
-      let location = await getIPInfo(ip);
+      const now = Date.now();
+      if (lastSeenIPs[ip] && now - lastSeenIPs[ip] < IP_TIMEOUT) {
+        continue;
+      }
 
-      let message = `📡 **Nowy pakiet wykryty**:
-🌍 IP: \`${ip}\`
-📍 Lokalizacja: \`${location}\`
-📦 Rozmiar pakietu: \`${size}\` bajtów`;
+      lastSeenIPs[ip] = now;
 
-      axios
-        .post(DISCORD_WEBHOOK_URL, { content: message })
-        .then(() => console.log(`✅ Wysłano alert o IP: ${ip}`))
-        .catch((err) => console.error("❌ Błąd wysyłania webhooka:", err));
+      let locationAndISP = await getIPInfo(ip);
+
+      const message = `🌍 IP: \`${ip}\`・📍 Lokalizacja i ISP: \`${locationAndISP}\`・📦 Rozmiar: \`${size}\` bajtów`;
+      messageQueue.push(message);
+
+      if (
+        messageQueue.length >= MAX_MESSAGES ||
+        now - lastSentTimestamp >= BATCH_INTERVAL
+      ) {
+        sendToDiscord();
+      }
     }
   });
 
   process.stderr?.on("data", (err) => console.error("❌ Błąd tcpdump:", err));
 }
+
+function sendToDiscord() {
+  const now = Date.now();
+
+  if (messageQueue.length === 0 || now - lastSentTimestamp < QUEUE_INTERVAL)
+    return;
+
+  const content = `📡 **Nowe pakiety wykryte:**\n${messageQueue.join("\n")}`;
+  messageQueue = [];
+  lastSentTimestamp = now;
+
+  axios
+    .post(DISCORD_WEBHOOK_URL, { content })
+    .then(() => console.log(`✅ Wysłano ${MAX_MESSAGES} wpisów na Discorda`))
+    .catch((err) => console.error("❌ Błąd wysyłania webhooka:", err));
+}
+
+setInterval(sendToDiscord, BATCH_INTERVAL);
 
 analyzeTraffic();
