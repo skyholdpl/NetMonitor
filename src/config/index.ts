@@ -1,4 +1,4 @@
-export const INTERFACES = ["eth0", "wlan0"];
+export const INTERFACES = ["eth0"];
 export const IP_TIMEOUT_MS = 90000;
 export const MAX_BATCH_SIZE = 6;
 export const DISPATCH_INTERVAL_MS = 60000;

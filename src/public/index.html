@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Statystyki Sieci</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h2>📊 Statystyki Sieci</h2>
+
+      <h3>📌 Ostatnie 10 Żądań</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>IP</th>
+            <th>Rozmiar (B)</th>
+            <th>Data i Godzina</th>
+          </tr>
+        </thead>
+        <tbody id="requestsTable"></tbody>
+      </table>
+
+      <h3>🚫 Czarna Lista IP</h3>
+      <ul id="blacklist"></ul>
+
+      <h3>🌍 Statystyki Krajów</h3>
+      <ul id="countryStats"></ul>
+
+      <h3>📡 Interfejsy Sieciowe</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Interfejs</th>
+            <th>Odebrane</th>
+            <th>Wysłane</th>
+            <th>Prędkość DL</th>
+            <th>Prędkość UL</th>
+            <th>Pkt. In</th>
+            <th>Pkt. Out</th>
+          </tr>
+        </thead>
+        <tbody id="interfacesTable"></tbody>
+      </table>
+    </div>
+
+    <script>
+      async function fetchData() {
+        try {
+          const response = await fetch("/api/traffic");
+          const data = await response.json();
+
+          const formatTimestamp = (ts) => {
+            const date = new Date(ts);
+            return date.toLocaleString("pl-PL", { hour12: false });
+          };
+
+          const requestsTable = document.getElementById("requestsTable");
+          requestsTable.innerHTML = data.recentRequests
+            .slice(0, 10)
+            .map(
+              (r) =>
+                `<tr><td>${r.ip}</td><td>${r.size}</td><td>${formatTimestamp(
+                  r.timestamp
+                )}</td></tr>`
+            )
+            .join("");
+
+          const blacklist = document.getElementById("blacklist");
+          blacklist.innerHTML = data.blacklisted.length
+            ? data.blacklisted.map((ip) => `<li>${ip}</li>`).join("")
+            : "<li>Brak zablokowanych IP</li>";
+
+          const countryStats = document.getElementById("countryStats");
+          countryStats.innerHTML = Object.entries(data.countryStats)
+            .map(([country, count]) => `<li>${country}: ${count} żądań</li>`)
+            .join("");
+
+          const interfacesTable = document.getElementById("interfacesTable");
+          interfacesTable.innerHTML = data.interfaces
+            .map(
+              (iface) => `
+                    <tr>
+                        <td>${iface.iface}</td>
+                        <td>${iface.stats.Inbound_bytes}</td>
+                        <td>${iface.stats.Outbound_bytes}</td>
+                        <td>${iface.stats.Inbound_speed}</td>
+                        <td>${iface.stats.Outbound_speed}</td>
+                        <td>${iface.stats.Packets_in}</td>
+                        <td>${iface.stats.Packets_out}</td>
+                    </tr>
+                `
+            )
+            .join("");
+        } catch (error) {
+          console.error("Błąd pobierania danych:", error);
+        }
+      }
+
+      fetchData();
+      setInterval(fetchData, 5000);
+    </script>
+  </body>
+</html>

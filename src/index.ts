@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import { analyzeTraffic } from "./utils/analyzeTraffic";
 import { sendToDiscord } from "./utils/sendToDiscord";
 
-console.log("📊 Network traffic monitoring...");
+console.log("Network traffic monitoring...");
 
 dotenv.config();
 
