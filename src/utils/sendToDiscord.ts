@@ -1,10 +1,17 @@
 import axios from "axios";
-import { messageQueue } from "../config";
 import { io } from "../server";
+import {
+  MAX_BATCH_SIZE,
+  countryStats,
+  BLACKLISTED_IPS,
+  recentRequests,
+  messageQueue,
+} from "../config";
+import { DISCORD_WEBHOOK_URL } from "../index";
 
-export async function sendToDiscord() {
+export function sendToDiscord() {
   if (messageQueue.length === 0) return;
-  const batch = messageQueue.splice(0, 6);
+  const batch = messageQueue.splice(0, MAX_BATCH_SIZE);
   const embed = {
     title: "New network activity detected",
     color: 16711680,
@@ -15,13 +22,11 @@ export async function sendToDiscord() {
     })),
     timestamp: new Date().toISOString(),
   };
-  try {
-    await axios.post(process.env.DISCORD_WEBHOOK_URL!, { embeds: [embed] });
-  } catch (error) {
-    console.error("Error sending to Discord:", error);
-  }
+  axios.post(DISCORD_WEBHOOK_URL, { embeds: [embed] }).catch(console.error);
 
   io.emit("updateData", {
-    messageQueue,
+    recentRequests,
+    blacklisted: Array.from(BLACKLISTED_IPS),
+    countryStats,
   });
 }
