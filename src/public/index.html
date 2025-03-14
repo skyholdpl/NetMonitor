@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Statystyki Sieci</title>
     <link rel="stylesheet" href="./style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.3/socket.io.js"></script>
   </head>
   <body>
     <div class="container">
@@ -21,6 +31,9 @@
         </thead>
         <tbody id="requestsTable"></tbody>
       </table>
+
+      <h3>🌐 Mapa requestów</h3>
+      <div id="map" style="height: 400px"></div>
 
       <h3>🚫 Czarna Lista IP</h3>
       <ul id="blacklist"></ul>
@@ -46,6 +59,8 @@
     </div>
 
     <script>
+      let map;
+
       async function fetchData() {
         try {
           const response = await fetch("/api/traffic");
@@ -77,20 +92,56 @@
             .map(([country, count]) => `<li>${country}: ${count} żądań</li>`)
             .join("");
 
+          if (!map) {
+            map = L.map("map").setView([20, 0], 2);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+              attribution: "&copy; OpenStreetMap contributors",
+            }).addTo(map);
+          } else {
+            map.setView([20, 0], 2);
+          }
+
+          const countryMarkers = {};
+          for (const country in data.countryStats) {
+            if (!countryMarkers[country]) {
+              fetch(
+                `https://nominatim.openstreetmap.org/search?country=${country}&format=json`
+              )
+                .then((res) => res.json())
+                .then((locations) => {
+                  if (locations.length > 0) {
+                    const lat = locations[0].lat;
+                    const lon = locations[0].lon;
+                    countryMarkers[country] = L.marker([lat, lon])
+                      .addTo(map)
+                      .bindPopup(
+                        `<b>${country}</b><br>Requests: ${data.countryStats[country]}`
+                      );
+                  }
+                });
+            } else {
+              countryMarkers[country]
+                .bindPopup(
+                  `<b>${country}</b><br>Requests: ${data.countryStats[country]}`
+                )
+                .openPopup();
+            }
+          }
+
           const interfacesTable = document.getElementById("interfacesTable");
           interfacesTable.innerHTML = data.interfaces
             .map(
               (iface) => `
-                    <tr>
-                        <td>${iface.iface}</td>
-                        <td>${iface.stats.Inbound_bytes}</td>
-                        <td>${iface.stats.Outbound_bytes}</td>
-                        <td>${iface.stats.Inbound_speed}</td>
-                        <td>${iface.stats.Outbound_speed}</td>
-                        <td>${iface.stats.Packets_in}</td>
-                        <td>${iface.stats.Packets_out}</td>
-                    </tr>
-                `
+                <tr>
+                    <td>${iface.iface}</td>
+                    <td>${iface.stats.Inbound_bytes}</td>
+                    <td>${iface.stats.Outbound_bytes}</td>
+                    <td>${iface.stats.Inbound_speed}</td>
+                    <td>${iface.stats.Outbound_speed}</td>
+                    <td>${iface.stats.Packets_in}</td>
+                    <td>${iface.stats.Packets_out}</td>
+                </tr>
+            `
             )
             .join("");
         } catch (error) {
