@@ -1,0 +1,9 @@
+export const IP_TIMEOUT_MS = 90000;
+export const MAX_BATCH_SIZE = 6;
+export const DISPATCH_INTERVAL_MS = 60000;
+export const BLACKLISTED_IPS = new Set();
+export const lastSeenIPs = new Map();
+export const recentRequests = [];
+export let messageQueue: any[] = [];
+export const trafficStats: { [ip: string]: number } = {};
+export const countryStats: { [country: string]: number } = {};
